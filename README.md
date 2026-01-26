@@ -40,6 +40,23 @@ POSTGRES_USER=crypto_admin
 POSTGRES_PASSWORD=<STRONG_PASSWORD>
 ```
 
+## Configure OpenAI API key
+Set your OpenAI key via `.env` (preferred):
+```sh
+cp .env.example .env
+# edit .env and set OPENAI_API_KEY=sk-...
+```
+Or per-run without global export:
+```sh
+OPENAI_API_KEY=sk-... python scripts/config_verify.py
+```
+
+Verify configuration and secrets:
+```sh
+python scripts/config_verify.py
+```
+The script imports `config.py`, validates exchanges/symbols/regimes, and checks that `OPENAI_API_KEY` is present.
+
 ## Start the database
 From the repo root:
 ```sh
@@ -135,4 +152,52 @@ Run this anytime to ensure the schema is applied/updated (idempotent):
 docker compose exec -T db psql -U crypto_admin -d crypto -v ON_ERROR_STOP=1 -f /dev/stdin < scripts/db_migrate.sql
 ```
 This script creates extensions, tables, compliant indexes, and hypertables with `IF NOT EXISTS`, so it’s safe to re-run.
+
+## Run Market Ingestion (Task 4)
+Run a single ingestion cycle to write rows into `market_metrics`:
+```sh
+source .venv/bin/activate
+python ingestion_market_mvp.py
+```
+What it does:
+- Initializes ccxt clients for each exchange in `config.EXCHANGES` (Binance, Bybit).
+- For each symbol in `config.SYMBOLS` (BTC/USDT, ETH/USDT, SOL/USDT), fetches:
+	- Current price (`ticker.last`/`close`)
+	- Hourly return (from 1h OHLCV)
+	- Funding rate (if supported by the exchange)
+	- Open interest (if supported)
+	- Volume (quote/base volume)
+	- Liquidations default to 0.0 (not widely available via ccxt)
+- Normalizes to the `market_metrics` schema and upserts on `(ts, symbol, exchange)`.
+
+Check results:
+```sh
+docker compose exec -T db psql -U crypto_admin -d crypto -c "SELECT ts, symbol, exchange, price, ret_1h, volume FROM market_metrics ORDER BY ts DESC LIMIT 9;"
+```
+
+If you need periodic ingestion, use:
+```sh
+source .venv/bin/activate
+python scheduler_mvp.py
+```
+This runs hourly and includes narratives and regimes steps too.
+
+### If you see 451/403 geo-block errors
+Some exchanges (Binance, Bybit) restrict access by country/region. Route requests via an allowed region using HTTP(S) proxies.
+
+Set per-run (no global export):
+```sh
+HTTP_PROXY=http://<proxy_host>:<port> \
+HTTPS_PROXY=http://<proxy_host>:<port> \
+python ingestion_market_mvp.py
+```
+Or add to `.env`:
+```env
+# .env
+HTTP_PROXY=http://<proxy_host>:<port>
+HTTPS_PROXY=http://<proxy_host>:<port>
+```
+The script auto-loads `.env` and configures ccxt with these proxies.
+
+
 

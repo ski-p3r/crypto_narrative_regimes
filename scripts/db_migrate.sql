@@ -1,10 +1,10 @@
--- TimescaleDB + core tables
+BEGIN;
 
--- Ensure TimescaleDB extension is available
+-- Ensure TimescaleDB is available
 CREATE EXTENSION IF NOT EXISTS timescaledb;
 
 -- 1) Market microstructure
-CREATE TABLE market_metrics (
+CREATE TABLE IF NOT EXISTS market_metrics (
     ts           TIMESTAMPTZ NOT NULL,
     symbol       TEXT        NOT NULL,
     exchange     TEXT        NOT NULL,
@@ -17,12 +17,10 @@ CREATE TABLE market_metrics (
     volume       DOUBLE PRECISION,
     PRIMARY KEY (ts, symbol, exchange)
 );
-
 SELECT create_hypertable('market_metrics', 'ts', if_not_exists => TRUE);
 
-
 -- 2) Narratives (global per snapshot)
-CREATE TABLE narratives (
+CREATE TABLE IF NOT EXISTS narratives (
     ts                    TIMESTAMPTZ NOT NULL,
     narrative_id          TEXT        NOT NULL,
     heat_score            DOUBLE PRECISION,
@@ -32,16 +30,12 @@ CREATE TABLE narratives (
     narrative_fingerprint CHAR(32),
     PRIMARY KEY (ts, narrative_id)
 );
-
--- Ensure uniqueness per snapshot (ts) to satisfy hypertable constraints
-CREATE UNIQUE INDEX narratives_ts_fp_idx
+SELECT create_hypertable('narratives', 'ts', if_not_exists => TRUE);
+CREATE UNIQUE INDEX IF NOT EXISTS narratives_ts_fp_idx
     ON narratives (ts, narrative_fingerprint);
 
-SELECT create_hypertable('narratives', 'ts', if_not_exists => TRUE);
-
-
 -- 3) Narrative–asset links
-CREATE TABLE narrative_assets (
+CREATE TABLE IF NOT EXISTS narrative_assets (
     ts             TIMESTAMPTZ NOT NULL,
     narrative_id   TEXT        NOT NULL,
     symbol         TEXT        NOT NULL,
@@ -49,12 +43,10 @@ CREATE TABLE narrative_assets (
     direction_bias DOUBLE PRECISION,
     PRIMARY KEY (ts, narrative_id, symbol)
 );
-
 SELECT create_hypertable('narrative_assets', 'ts', if_not_exists => TRUE);
 
-
 -- 4) Regimes per symbol
-CREATE TABLE regimes (
+CREATE TABLE IF NOT EXISTS regimes (
     ts         TIMESTAMPTZ NOT NULL,
     symbol     TEXT        NOT NULL,
     regime     TEXT        NOT NULL,
@@ -64,14 +56,14 @@ CREATE TABLE regimes (
     meta_json  JSONB,
     PRIMARY KEY (ts, symbol)
 );
-
 SELECT create_hypertable('regimes', 'ts', if_not_exists => TRUE);
 
-
--- 5) Regime threshold versions (optional – for future tuning)
-CREATE TABLE regime_thresholds (
+-- 5) Regime threshold versions
+CREATE TABLE IF NOT EXISTS regime_thresholds (
     version        INT PRIMARY KEY,
     cfg            JSONB NOT NULL,
     sharpe_oos     DOUBLE PRECISION,
     created_at     TIMESTAMPTZ DEFAULT NOW()
 );
+
+COMMIT;

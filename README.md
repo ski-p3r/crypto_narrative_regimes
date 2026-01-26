@@ -199,5 +199,15 @@ HTTPS_PROXY=http://<proxy_host>:<port>
 ```
 The script auto-loads `.env` and configures ccxt with these proxies.
 
+### Alternatively: mock mode (no network)
+If you only need to verify the pipeline writes rows, enable mock mode:
+```sh
+echo "INGEST_MOCK=1" >> .env
+source .venv/bin/activate
+python ingestion_market_mvp.py
+```
+This inserts deterministic rows for BTC/USDT, ETH/USDT, and SOL/USDT across Binance and Bybit without calling exchanges.
+
+
 
 

@@ -92,6 +92,29 @@ def _safe_fetch_open_interest(ex, symbol):
 
 
 def fetch_for_exchange(ex_name: str, ts):
+    # Mock mode: bypass live exchange calls if env flag set
+    if os.getenv("INGEST_MOCK") in {"1", "true", "True"}:
+        rows = []
+        # Deterministic mock values per symbol/exchange
+        base_prices = {"BTC/USDT": 42000.0, "ETH/USDT": 2200.0, "SOL/USDT": 95.0}
+        vol_mult = {"binance": 1.0, "bybit": 0.8}
+        for symbol in SYMBOLS:
+            p = base_prices.get(symbol, 100.0)
+            rows.append({
+                "ts": ts,
+                "symbol": symbol,
+                "exchange": ex_name,
+                "price": p,
+                "ret_1h": 0.001,
+                "oi": 1_000_000.0 * vol_mult.get(ex_name, 0.5),
+                "funding": 0.0001,
+                "long_liq_usd": 0.0,
+                "short_liq_usd": 0.0,
+                "volume": 10_000_000.0 * vol_mult.get(ex_name, 0.5),
+            })
+        log.info(f"[MKT] {ex_name} mock fetched {len(rows)} symbols")
+        return rows
+
     ex = get_exchange(ex_name)
     rows = []
     for symbol in SYMBOLS:

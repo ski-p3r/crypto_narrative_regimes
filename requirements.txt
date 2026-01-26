@@ -1,0 +1,7 @@
+ccxt
+pandas
+SQLAlchemy
+psycopg2-binary
+openai
+apscheduler
+python-dotenv

@@ -259,15 +259,17 @@ def fetch_for_exchange(ex_name: str, ts):
                 # Use 24h quote volume as a proxy for activity; ret_1h not available
                 vol_key = f"{quote}_24h_vol"
                 volume_quote = entry.get(vol_key)
-                # Compute 1h return via market_chart (hourly) last two points
+                # Compute 1h return via market_chart RANGE using last 2h window
                 ret_1h = None
                 try:
+                    to_epoch = int(ts.timestamp())
+                    from_epoch = to_epoch - 7200
                     r2 = requests.get(
-                        f"https://api.coingecko.com/api/v3/coins/{cid}/market_chart",
+                        f"https://api.coingecko.com/api/v3/coins/{cid}/market_chart/range",
                         params={
                             "vs_currency": quote,
-                            "days": 1,
-                            "interval": "hourly",
+                            "from": from_epoch,
+                            "to": to_epoch,
                         },
                         headers=headers,
                         timeout=10,
@@ -275,13 +277,15 @@ def fetch_for_exchange(ex_name: str, ts):
                     if r2.ok:
                         mc = r2.json() or {}
                         prices = mc.get("prices") or []
+                        # filter out nulls and require at least two points
+                        prices = [p for p in prices if p and p[1] is not None]
                         if len(prices) >= 2:
                             prev_close = float(prices[-2][1])
                             last_close = float(prices[-1][1])
                             if prev_close:
                                 ret_1h = (last_close - prev_close) / prev_close
                 except Exception as e:
-                    log.debug(f"[CG] market_chart failed for {cid}/{quote}: {e}")
+                    log.debug(f"[CG] market_chart range failed for {cid}/{quote}: {e}")
                 rows.append({
                     "ts": ts,
                     "symbol": symbol,

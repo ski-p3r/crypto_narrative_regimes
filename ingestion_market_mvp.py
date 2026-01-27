@@ -167,7 +167,12 @@ def fetch_for_exchange(ex_name: str, ts):
             try:
                 r = requests.get(
                     "https://data-api.binance.vision/api/v3/klines",
-                    params={"symbol": bn_symbol, "interval": "1h", "limit": 2},
+                    params={
+                        "symbol": bn_symbol,
+                        "interval": "1h",
+                        "limit": 2,
+                        "endTime": int(ts.timestamp() * 1000),
+                    },
                     headers=headers,
                     timeout=10,
                 )
@@ -179,9 +184,8 @@ def fetch_for_exchange(ex_name: str, ts):
                         volume_quote = float(kl[-1][7]) if len(kl[-1]) > 7 else None
                         if prev_close:
                             ret_1h = (last_close - prev_close) / prev_close
-                        # If ticker price missing, use last_close
-                        if price is None:
-                            price = last_close
+                        # Use last_close for coherence with ret_1h
+                        price = last_close
             except Exception as e:
                 log.debug(f"[BINANCE] klines failed {bn_symbol}: {e}")
 

@@ -259,12 +259,35 @@ def fetch_for_exchange(ex_name: str, ts):
                 # Use 24h quote volume as a proxy for activity; ret_1h not available
                 vol_key = f"{quote}_24h_vol"
                 volume_quote = entry.get(vol_key)
+                # Compute 1h return via market_chart (hourly) last two points
+                ret_1h = None
+                try:
+                    r2 = requests.get(
+                        f"https://api.coingecko.com/api/v3/coins/{cid}/market_chart",
+                        params={
+                            "vs_currency": quote,
+                            "days": 1,
+                            "interval": "hourly",
+                        },
+                        headers=headers,
+                        timeout=10,
+                    )
+                    if r2.ok:
+                        mc = r2.json() or {}
+                        prices = mc.get("prices") or []
+                        if len(prices) >= 2:
+                            prev_close = float(prices[-2][1])
+                            last_close = float(prices[-1][1])
+                            if prev_close:
+                                ret_1h = (last_close - prev_close) / prev_close
+                except Exception as e:
+                    log.debug(f"[CG] market_chart failed for {cid}/{quote}: {e}")
                 rows.append({
                     "ts": ts,
                     "symbol": symbol,
                     "exchange": ex_name,
                     "price": float(price) if price is not None else None,
-                    "ret_1h": None,
+                    "ret_1h": ret_1h,
                     "oi": None,
                     "funding": None,
                     "long_liq_usd": 0.0,

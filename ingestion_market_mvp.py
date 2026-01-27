@@ -147,6 +147,10 @@ def fetch_for_exchange(ex_name: str, ts):
         def _bn_sym(sym_ccxt: str) -> str:
             return sym_ccxt.replace("/", "").upper()
 
+        # Anchor to previous full hour to ensure closed candle alignment
+        ts_hour_end = ts.replace(minute=0, second=0, microsecond=0)
+        end_ms = int(ts_hour_end.timestamp() * 1000)
+
         for symbol in SYMBOLS:
             bn_symbol = _bn_sym(symbol)
             price = None
@@ -171,7 +175,7 @@ def fetch_for_exchange(ex_name: str, ts):
                         "symbol": bn_symbol,
                         "interval": "1h",
                         "limit": 2,
-                        "endTime": int(ts.timestamp() * 1000),
+                        "endTime": end_ms,
                     },
                     headers=headers,
                     timeout=10,

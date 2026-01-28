@@ -9,11 +9,17 @@ services:
       POSTGRES_USER: crypto_admin
       POSTGRES_PASSWORD: change_me_please
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       # Mount schema to initialize DB on first run
       - ./schema.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
 
 volumes:
   postgres_data:

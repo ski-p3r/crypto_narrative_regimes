@@ -1,41 +1,30 @@
 # Shared configuration and thresholds
 
-EXCHANGES = ["binance", "bybit"]
+EXCHANGES = ["coinbase"]
 
 SYMBOLS = ["BTC/USDT", "ETH/USDT", "SOL/USDT"]
 
 # Minimum number of observations per symbol for meaningful stats
 MIN_OBS = 10
 
-# Regime thresholds (MVP – tune via backtests)
+# Regime thresholds (Spot-only for US Market)
 REGIME_CFG = {
-    "OVERHEATED": {
-        "heat_min": 0.85,
-        "oi_z_min": 1.5,
-        "funding_z_min": 1.0,
-    },
-    "IGNITION": {
+    "SPOT_IGNITION": {
         "heat_min": 0.6,
-        "oi_z_min": 0.5,
-        "funding_z_min": 0.2,
-        "liq_intensity_max": 1.0,
+        "price_z_min": 1.0,
+        "vol_z_min": 1.5,
     },
-    "FUNDING_RESET_IGNITION": {
-        "heat_min": 0.4,
-        "heat_delta_min": 0.1,
-        "oi_z_min": -0.5,
-        "oi_z_max": 1.0,
-        "funding_max": 0.0,  # negative or zero
+    "SPOT_COOLING": {
+        "heat_max": 0.4,
+        "price_z_max": -0.5,
+        "vol_z_max": 0.5,
     },
-    "PANIC": {
-        "liq_bias_max": -0.6,
-        "liq_intensity_min": 1.5,
-        "oi_z_max": -0.5,
+    "SPOT_CHOP": {
+        "heat_max": 0.5,
+        "price_z_abs_max": 0.5,
+        "vol_z_max": 1.0,
     },
-    "COILED": {
-        "heat_max": 0.3,
-        "oi_z_min": 0.5,
-        "funding_z_abs_max": 0.3,
-        "liq_intensity_max": 0.5,
-    },
+    "SPOT_NEUTRAL": {
+        # Fallback if no other condition met
+    }
 }

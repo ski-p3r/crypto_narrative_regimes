@@ -1,213 +1,123 @@
-# Crypto Narrative Regimes – Database Setup (Docker)
+# Crypto Narrative & Regime Analysis Pipeline
 
-This repo includes a Docker-only Postgres (TimescaleDB) setup accessible via both localhost and the droplet IP.
+This project implements an automated pipeline to:
+1. Ingest crypto market data (Spot only for US market).
+2. Generate AI-driven narratives using OpenAI.
+3. Classify market regimes (e.g., SPOT_IGNITION, SPOT_COOLING).
 
 ## Prerequisites
-- Ubuntu/Debian on droplet
-- `sudo` privileges
-- Docker Engine and Compose plugin
+- Ubuntu 20.04+ (or similar Linux environment)
+- Python 3.10+
+- PostgreSQL 14+ (TimescaleDB recommended but optional)
+- OpenAI API Key
 
-### Install Docker & Compose
-```sh
-sudo apt update
-sudo apt install -y ca-certificates curl gnupg lsb-release
-sudo install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-sudo apt update
-sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-sudo usermod -aG docker $USER
-newgrp docker
-docker compose version
+## Setup Instructions
+
+### 1. System Dependencies
+```bash
+sudo apt-get update
+sudo apt-get install -y python3 python3-venv python3-pip postgresql postgresql-contrib
 ```
 
-Optional firewall rule to allow external access:
-```sh
-sudo ufw allow 5432/tcp
+### 2. Database Setup
+#### Option A: Using Docker (Recommended for Testing)
+If you have Docker installed, you can spin up the database easily:
+```bash
+# Start Postgres
+docker-compose up -d
+
+# The schema.sql is automatically applied on the first run.
+# If you need to re-apply it manually:
+# docker exec -i crypto_db psql -U crypto_admin -d crypto < schema.sql
 ```
 
-## Configure DB credentials
-Create your `.env` from the example and set a strong `POSTGRES_PASSWORD`:
-```env
-cp .env.example .env
-# then edit .env and change POSTGRES_PASSWORD
+#### Option B: Manual Setup
+Create the database and user:
+```bash
+sudo -u postgres psql
+```
+Inside the `psql` shell:
+```sql
+CREATE DATABASE crypto;
+CREATE USER crypto_admin WITH ENCRYPTED PASSWORD 'change_me_please';
+GRANT ALL PRIVILEGES ON DATABASE crypto TO crypto_admin;
+\c crypto
+-- Enable TimescaleDB if installed, otherwise skip
+-- CREATE EXTENSION IF NOT EXISTS timescaledb;
+```
+Exit `psql` (`\q`).
+
+Initialize the schema:
+```bash
+# Set DB_URL temporarily for the schema script if needed, or just use psql
+export DB_URL="postgresql://crypto_admin:change_me_please@localhost:5432/crypto"
+psql $DB_URL -f schema.sql
 ```
 
-Example values (edit these in `.env`):
-```env
-POSTGRES_DB=crypto
-POSTGRES_USER=crypto_admin
-POSTGRES_PASSWORD=<STRONG_PASSWORD>
+### 3. Project Setup
+Clone/Unzip the repo and enter the directory:
+```bash
+cd crypto_narrative_regimes
 ```
 
-## Configure OpenAI API key
-Set your OpenAI key via `.env` (preferred):
-```sh
-cp .env.example .env
-# edit .env and set OPENAI_API_KEY=sk-...
-```
-Or per-run without global export:
-```sh
-OPENAI_API_KEY=sk-... python scripts/config_verify.py
+Create and activate virtual environment:
+```bash
+python3 -m venv venv
+source venv/bin/activate
 ```
 
-Verify configuration and secrets:
-```sh
-python scripts/config_verify.py
-```
-The script imports `config.py`, validates exchanges/symbols/regimes, and checks that `OPENAI_API_KEY` is present.
-
-## Start the database
-From the repo root:
-```sh
-docker compose up -d
-docker compose ps
-```
-On first start, `schema.sql` runs in the `crypto` DB and creates all tables.
-
-## Set DB_URL
-Export the connection string for apps and scripts:
-```sh
-export DB_URL="postgresql+psycopg2://crypto_admin:<STRONG_PASSWORD>@127.0.0.1:5432/crypto"
-```
-Use the droplet IP instead of `127.0.0.1` when connecting remotely.
-
-## Verify connectivity from Python
-Create and activate your venv (see Task 1), then:
-```sh
-python -m pip install --upgrade pip
+Install Python dependencies:
+```bash
 pip install -r requirements.txt
-python scripts/db_verify.py
-```
-Expected output includes the list of tables and the message `DB connectivity OK and schema present.`
-
-### Verify without exporting DB_URL globally
-`scripts/db_verify.py` automatically loads `.env` using python-dotenv and constructs the connection string if `DB_URL` is not set. Simply run:
-```sh
-python scripts/db_verify.py
-```
-To override host/port per-invocation without a global export:
-```sh
-DB_HOST=127.0.0.1 DB_PORT=5432 python scripts/db_verify.py
 ```
 
-## Troubleshooting Connectivity
-
-If the Python script or your app can’t connect to the database, try these checks:
-
-1) Check container health and logs
-```sh
-docker compose ps
-docker compose logs -f db
+### 4. Configuration
+Create a `.env` file from the example:
+```bash
+cp .env.example .env
+```
+Edit `.env` and set your credentials:
+```bash
+nano .env
+```
+Content:
+```ini
+DB_URL=postgresql://myuser:mypassword@localhost:5432/crypto
+OPENAI_API_KEY=sk-proj-...
 ```
 
-2) Test connectivity with `psql` from the host
-```sh
-# Install client if missing
-sudo apt install -y postgresql-client
+## Running the Pipeline
 
-# List tables
-psql -h 127.0.0.1 -U crypto_admin -d crypto -c '\dt'
+### Individual Scripts
+You can run each stage manually for testing:
+
+1. **Market Ingestion** (Fetches data from Coinbase/Binance.US):
+   ```bash
+   python3 ingestion_market_mvp.py
+   ```
+   *Check logs for `[MKT]` messages.*
+
+2. **Narrative Generation** (Calls OpenAI):
+   ```bash
+   python3 narrative_stream_openai_v4.py
+   ```
+   *Check logs for `[NARR]` messages.*
+
+3. **Regime Classification** (Computes features and regimes):
+   ```bash
+   python3 regimes_mvp.py
+   ```
+   *Check logs for `[REG]` messages.*
+
+### Scheduler (Production)
+To run the full pipeline continuously (every hour):
+```bash
+python3 scheduler_mvp.py
 ```
+*Recommendation: Run this in a `tmux` session or as a systemd service to keep it running in the background.*
 
-3) Confirm credentials match `.env`
-- Ensure `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB` in `.env` are correct.
-- If you change `POSTGRES_PASSWORD` after first run, recreate the container:
-```sh
-docker compose down
-docker compose up -d
-```
-Note: `docker compose down -v` will also delete data; only use `-v` if you intend to reset the database.
-
-4) Verify port and firewall
-```sh
-# Port listening on 0.0.0.0:5432
-ss -ltnp | grep 5432
-
-# UFW allows inbound 5432/tcp
-sudo ufw status
-sudo ufw allow 5432/tcp
-```
-For remote clients, connect using the droplet IP (e.g., `psql -h <droplet_ip> ...`) and ensure cloud firewall/security group allows 5432/tcp.
-
-5) Run the verification with explicit envs (no global export)
-```sh
-POSTGRES_USER=crypto_admin POSTGRES_PASSWORD=<STRONG_PASSWORD> DB_HOST=127.0.0.1 DB_PORT=5432 POSTGRES_DB=crypto \
-python scripts/db_verify.py
-```
-
-6) Ensure schema applied and hypertables exist
-```sh
-# List tables from inside the container
-docker compose exec -T db psql -U crypto_admin -d crypto -c '\dt'
-
-# If some tables are missing, apply the fix script
-docker compose exec -T db psql -U crypto_admin -d crypto -v ON_ERROR_STOP=1 -f /dev/stdin < scripts/db_fix_narratives.sql
-```
-The fix script adjusts the `narratives` unique index to include `ts` and creates missing hypertables.
-
-## Migrate Schema (one-liner)
-Run this anytime to ensure the schema is applied/updated (idempotent):
-```sh
-docker compose exec -T db psql -U crypto_admin -d crypto -v ON_ERROR_STOP=1 -f /dev/stdin < scripts/db_migrate.sql
-```
-This script creates extensions, tables, compliant indexes, and hypertables with `IF NOT EXISTS`, so it’s safe to re-run.
-
-## Run Market Ingestion (Task 4)
-Run a single ingestion cycle to write rows into `market_metrics`:
-```sh
-source .venv/bin/activate
-python ingestion_market_mvp.py
-```
-What it does:
-- Initializes ccxt clients for each exchange in `config.EXCHANGES` (Binance, Bybit).
-- For each symbol in `config.SYMBOLS` (BTC/USDT, ETH/USDT, SOL/USDT), fetches:
-	- Current price (`ticker.last`/`close`)
-	- Hourly return (from 1h OHLCV)
-	- Funding rate (if supported by the exchange)
-	- Open interest (if supported)
-	- Volume (quote/base volume)
-	- Liquidations default to 0.0 (not widely available via ccxt)
-- Normalizes to the `market_metrics` schema and upserts on `(ts, symbol, exchange)`.
-
-Check results:
-```sh
-docker compose exec -T db psql -U crypto_admin -d crypto -c "SELECT ts, symbol, exchange, price, ret_1h, volume FROM market_metrics ORDER BY ts DESC LIMIT 9;"
-```
-
-If you need periodic ingestion, use:
-```sh
-source .venv/bin/activate
-python scheduler_mvp.py
-```
-This runs hourly and includes narratives and regimes steps too.
-
-### If you see 451/403 geo-block errors
-Some exchanges (Binance, Bybit) restrict access by country/region. Route requests via an allowed region using HTTP(S) proxies.
-
-Set per-run (no global export):
-```sh
-HTTP_PROXY=http://<proxy_host>:<port> \
-HTTPS_PROXY=http://<proxy_host>:<port> \
-python ingestion_market_mvp.py
-```
-Or add to `.env`:
-```env
-# .env
-HTTP_PROXY=http://<proxy_host>:<port>
-HTTPS_PROXY=http://<proxy_host>:<port>
-```
-The script auto-loads `.env` and configures ccxt with these proxies.
-
-### Alternatively: mock mode (no network)
-If you only need to verify the pipeline writes rows, enable mock mode:
-```sh
-echo "INGEST_MOCK=1" >> .env
-source .venv/bin/activate
-python ingestion_market_mvp.py
-```
-This inserts deterministic rows for BTC/USDT, ETH/USDT, and SOL/USDT across Binance and Bybit without calling exchanges.
-
-
-
-
+## Caveats & Notes
+- **US Market Only**: Currently configured to use `coinbase` (Coinbase Pro) and `binanceus` (if available) due to US restrictions.
+- **Spot Regimes**: Regime classification is adapted for spot-only data (Price/Volume) as Futures data (OI/Funding) is unavailable in the US.
+- **Rate Limits**: The ingestion script respects rate limits, but if you run it too frequently, you might get 429s.
+- **Logs**: Logs are printed to stdout/stderr. Redirect them to a file if needed (e.g., `python3 scheduler_mvp.py > pipeline.log 2>&1`).

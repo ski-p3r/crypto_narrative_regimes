@@ -1,8 +1,5 @@
 -- TimescaleDB + core tables
 
--- Ensure TimescaleDB extension is available
-CREATE EXTENSION IF NOT EXISTS timescaledb;
-
 -- 1) Market microstructure
 CREATE TABLE market_metrics (
     ts           TIMESTAMPTZ NOT NULL,
@@ -33,9 +30,8 @@ CREATE TABLE narratives (
     PRIMARY KEY (ts, narrative_id)
 );
 
--- Ensure uniqueness per snapshot (ts) to satisfy hypertable constraints
-CREATE UNIQUE INDEX narratives_ts_fp_idx
-    ON narratives (ts, narrative_fingerprint);
+CREATE UNIQUE INDEX narratives_fp_idx
+    ON narratives (narrative_fingerprint);
 
 SELECT create_hypertable('narratives', 'ts', if_not_exists => TRUE);
 

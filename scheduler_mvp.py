@@ -1,4 +1,7 @@
 import time
+import os
+from dotenv import load_dotenv
+load_dotenv()
 import logging
 
 from apscheduler.schedulers.blocking import BlockingScheduler

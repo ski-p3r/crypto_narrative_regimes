@@ -1,23 +1,19 @@
-version: "3.9"
+version: '3.8'
 
 services:
   db:
-    image: timescale/timescaledb:latest-pg15
+    image: postgres:14
     container_name: crypto_db
-    restart: unless-stopped
-    env_file:
-      - .env
+    environment:
+      POSTGRES_DB: crypto
+      POSTGRES_USER: crypto_admin
+      POSTGRES_PASSWORD: change_me_please
     ports:
-      - "0.0.0.0:5432:5432"  # expose to localhost and droplet IP
+      - "5432:5432"
     volumes:
-      - db_data:/var/lib/postgresql/data
-      - ./schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - postgres_data:/var/lib/postgresql/data
+      # Mount schema to initialize DB on first run
+      - ./schema.sql:/docker-entrypoint-initdb.d/init.sql
 
 volumes:
-  db_data:
-    driver: local
+  postgres_data:

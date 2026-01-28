@@ -1,6 +1,6 @@
 # Shared configuration and thresholds
 
-EXCHANGES = ["coinbase"]
+EXCHANGES = ["binanceus"]
 
 SYMBOLS = ["BTC/USDT", "ETH/USDT", "SOL/USDT"]
 

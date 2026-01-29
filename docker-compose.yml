@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   db:
     image: postgres:14
@@ -20,6 +18,24 @@ services:
       timeout: 5s
       retries: 10
     restart: unless-stopped
+
+  app:
+    build: .
+    container_name: crypto_app
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Override DB_URL to connect to the db service from inside the network
+      DB_URL: postgresql://crypto_admin:change_me_please@db:5432/crypto
+      # Provide your OpenAI key via compose .env (OPENAI_API_KEY=...) or export in shell before `docker compose up`
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    working_dir: /app
+    command: ["python", "scheduler_mvp.py"]
+    restart: unless-stopped
+    # For live editing, mount the repo into the container (optional)
+    volumes:
+      - .:/app
 
 volumes:
   postgres_data:

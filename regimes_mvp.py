@@ -113,10 +113,24 @@ def compute_features_and_classify_regimes():
         log.warning("[REG] No market data in last 7 days")
         return
 
+    # Ensure expected columns exist
+    expected_cols = {"ts", "symbol", "exchange", "price", "volume"}
+    missing = expected_cols - set(df.columns)
+    if missing:
+        log.error(f"[REG] Missing columns in market_metrics: {missing}")
+        return
+
+    # Normalize dtypes and avoid index leakage later
+    df["symbol"] = df["symbol"].astype(str)
+
     # 2) Add features per symbol
     df = df.groupby("symbol", group_keys=False).apply(
         lambda g: add_features_for_symbol(g, window=24*7)
     )
+
+    # Drop any multi-index introduced by groupby/apply to ensure columns are accessible
+    if isinstance(df.index, pd.MultiIndex) or df.index.name is not None:
+        df = df.reset_index(drop=True)
 
     if df.empty:
         log.warning("[REG] No rows after feature computation (likely too few obs)")
@@ -153,11 +167,14 @@ def compute_features_and_classify_regimes():
             symbol_coh[sym] = coherence
 
     latest_ts = df["ts"].max()
-    last_rows = df[df["ts"] == latest_ts]
+    last_rows = df[df["ts"] == latest_ts].copy()
+    if "symbol" not in last_rows.columns:
+        # If symbol leaked into the index somehow, bring it back
+        last_rows = last_rows.reset_index()
 
     out = []
     for _, row in last_rows.iterrows():
-        sym = row["symbol"]
+        sym = row["symbol"] if "symbol" in row.index else (row.get("symbol") or (row.name[0] if isinstance(row.name, tuple) else row.name))
         heat = symbol_heat.get(sym, 0.0)
         coherence = symbol_coh.get(sym, 1.0)  # assume okay if missing
 

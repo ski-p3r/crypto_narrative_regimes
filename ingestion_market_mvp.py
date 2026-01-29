@@ -4,7 +4,7 @@ load_dotenv()
 import time
 import logging
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 import ccxt
 import pandas as pd
@@ -21,7 +21,9 @@ engine = create_engine(DB_URL)
 
 FAILURE_COUNT = defaultdict(int)
 CIRCUIT_OPEN = defaultdict(bool)
+CIRCUIT_OPENED_AT = {}
 CIRCUIT_THRESHOLD = 3  # after 3 consecutive failures, open circuit
+COOLDOWN_SECONDS = 900  # try to auto-close circuit after 15 minutes
 
 
 def get_exchange(name: str):
@@ -32,15 +34,34 @@ def fetch_for_exchange(ex_name: str, ts):
     ex = get_exchange(ex_name)
     rows = []
     for symbol in SYMBOLS:
+        # Ticker for price and 24h context
         ticker = ex.fetch_ticker(symbol)
 
+        # Price
         price = ticker.get("last") or ticker.get("close")
+
+        # Compute 1h return using OHLCV last two 1h candles if available
         ret_1h = None
-        if ticker.get("open"):
+        try:
+            ohlcv = ex.fetch_ohlcv(symbol, timeframe="1h", limit=2)
+            if ohlcv and len(ohlcv) >= 2:
+                prev_close = float(ohlcv[-2][4])
+                last_close = float(ohlcv[-1][4])
+                if prev_close != 0:
+                    ret_1h = (last_close - prev_close) / prev_close
+        except Exception:
+            # Keep ret_1h as None on OHLCV errors
+            pass
+
+        # Volume approximation: prefer ticker quoteVolume if present; otherwise base_vol * price
+        vol_quote = ticker.get("quoteVolume")
+        if vol_quote is None:
             try:
-                ret_1h = (price - ticker["open"]) / ticker["open"]
-            except ZeroDivisionError:
-                ret_1h = None
+                if ohlcv and len(ohlcv) >= 1 and price is not None:
+                    base_vol = float(ohlcv[-1][5])
+                    vol_quote = base_vol * float(price)
+            except Exception:
+                vol_quote = None
 
         rows.append({
             "ts": ts,
@@ -52,7 +73,7 @@ def fetch_for_exchange(ex_name: str, ts):
             "funding": None,
             "long_liq_usd": 0.0,
             "short_liq_usd": 0.0,
-            "volume": ticker.get("quoteVolume"),
+            "volume": vol_quote,
         })
     return rows
 
@@ -67,7 +88,20 @@ def upsert_rows(rows):
     with engine.begin() as conn:
         for row in rows:
             stmt = insert(market_table).values(**row)
-            stmt = stmt.on_conflict_do_nothing()
+            # Upsert by primary key (ts, symbol, exchange)
+            update_cols = {
+                "price": stmt.excluded.price,
+                "ret_1h": stmt.excluded.ret_1h,
+                "oi": stmt.excluded.oi,
+                "funding": stmt.excluded.funding,
+                "long_liq_usd": stmt.excluded.long_liq_usd,
+                "short_liq_usd": stmt.excluded.short_liq_usd,
+                "volume": stmt.excluded.volume,
+            }
+            stmt = stmt.on_conflict_do_update(
+                index_elements=[market_table.c.ts, market_table.c.symbol, market_table.c.exchange],
+                set_=update_cols,
+            )
             conn.execute(stmt)
 
 
@@ -77,18 +111,26 @@ def run_ingestion_cycle():
 
     for ex_name in EXCHANGES:
         if CIRCUIT_OPEN[ex_name]:
-            log.warning(f"[MKT] {ex_name} circuit OPEN, skipping this cycle")
-            continue
+            opened_at = CIRCUIT_OPENED_AT.get(ex_name)
+            if opened_at and datetime.now(timezone.utc) - opened_at > timedelta(seconds=COOLDOWN_SECONDS):
+                log.info(f"[MKT] {ex_name} circuit cooldown elapsed; attempting to close")
+                CIRCUIT_OPEN[ex_name] = False
+            else:
+                log.warning(f"[MKT] {ex_name} circuit OPEN, skipping this cycle")
+                continue
 
         try:
             rows = fetch_for_exchange(ex_name, ts)
             all_rows.extend(rows)
             FAILURE_COUNT[ex_name] = 0
+            if ex_name in CIRCUIT_OPENED_AT:
+                CIRCUIT_OPENED_AT.pop(ex_name, None)
         except Exception as e:
             FAILURE_COUNT[ex_name] += 1
             log.warning(f"[MKT] {ex_name} failure {FAILURE_COUNT[ex_name]}: {e}")
             if FAILURE_COUNT[ex_name] >= CIRCUIT_THRESHOLD:
                 CIRCUIT_OPEN[ex_name] = True
+                CIRCUIT_OPENED_AT[ex_name] = datetime.now(timezone.utc)
                 log.error(f"[CRIT] Circuit breaker OPEN for {ex_name}")
 
     upsert_rows(all_rows)

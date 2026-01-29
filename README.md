@@ -11,27 +11,23 @@ This project implements an automated pipeline to:
 - PostgreSQL 14+ (TimescaleDB recommended but optional)
 - OpenAI API Key
 
-## Setup Instructions
+## Setup Instructions (DigitalOcean Droplet)
 
-### 1. System Dependencies
+### 1. System Access & Dependencies
+SSH into your droplet and confirm sudo:
+```bash
+ssh <user>@<droplet_ip>
+sudo -v
+```
+
+Install system packages:
 ```bash
 sudo apt-get update
 sudo apt-get install -y python3 python3-venv python3-pip postgresql postgresql-contrib
 ```
 
 ### 2. Database Setup
-#### Option A: Using Docker (Recommended for Testing)
-If you have Docker installed, you can spin up the database easily:
-```bash
-# Start Postgres
-docker-compose up -d
-
-# The schema.sql is automatically applied on the first run.
-# If you need to re-apply it manually:
-# docker exec -i crypto_db psql -U crypto_admin -d crypto < schema.sql
-```
-
-#### Option B: Manual Setup
+#### Create the database and user (Plain Postgres OK)
 Create the database and user:
 ```bash
 sudo -u postgres psql
@@ -42,7 +38,7 @@ CREATE DATABASE crypto;
 CREATE USER crypto_admin WITH ENCRYPTED PASSWORD 'change_me_please';
 GRANT ALL PRIVILEGES ON DATABASE crypto TO crypto_admin;
 \c crypto
--- Enable TimescaleDB if installed, otherwise skip
+-- Optional: Enable TimescaleDB if installed
 -- CREATE EXTENSION IF NOT EXISTS timescaledb;
 ```
 Exit `psql` (`\q`).
@@ -55,8 +51,10 @@ psql $DB_URL -f schema.sql
 ```
 
 ### 3. Project Setup
-Clone/Unzip the repo and enter the directory:
+Create project directory and unzip the repo into it:
 ```bash
+mkdir -p ~/sentiment && cd ~/sentiment
+unzip /path/to/crypto_narrative_regimes.zip -d crypto_narrative_regimes
 cd crypto_narrative_regimes
 ```
 
@@ -86,12 +84,23 @@ DB_URL=postgresql://myuser:mypassword@localhost:5432/crypto
 OPENAI_API_KEY=sk-proj-...
 ```
 
+Export env vars for current shell (MVP):
+```bash
+export DB_URL=postgresql://crypto_admin:change_me_please@localhost:5432/crypto
+export OPENAI_API_KEY=sk-...  # replace with your key
+```
+
+Verify Python deps import cleanly:
+```bash
+python -c "import ccxt, pandas, sqlalchemy, apscheduler, openai; print('ok')"
+```
+
 ## Running the Pipeline
 
 ### Individual Scripts
 You can run each stage manually for testing:
 
-1. **Market Ingestion** (Fetches data from Coinbase/Binance.US):
+1. **Market Ingestion** (Spot-only via `binanceus`):
    ```bash
    python3 ingestion_market_mvp.py
    ```
@@ -114,10 +123,49 @@ To run the full pipeline continuously (every hour):
 ```bash
 python3 scheduler_mvp.py
 ```
-*Recommendation: Run this in a `tmux` session or as a systemd service to keep it running in the background.*
+Recommendation: Run this in a `tmux` session or as a systemd service to keep it running in the background.
+
+Quick tmux example:
+```bash
+tmux new -s crypto
+source venv/bin/activate
+export DB_URL=postgresql://crypto_admin:change_me_please@localhost:5432/crypto
+export OPENAI_API_KEY=sk-...
+python scheduler_mvp.py
+# detach with Ctrl+b then d
+```
+
+Systemd unit (example):
+Create `/etc/systemd/system/crypto-narrative.service` with:
+```
+[Unit]
+Description=Crypto Narrative Pipeline
+After=network-online.target postgresql.service
+
+[Service]
+Type=simple
+User=%i
+WorkingDirectory=/home/%i/sentiment/crypto_narrative_regimes
+Environment=DB_URL=postgresql://crypto_admin:change_me_please@localhost:5432/crypto
+Environment=OPENAI_API_KEY=sk-...
+ExecStart=/home/%i/sentiment/crypto_narrative_regimes/venv/bin/python /home/%i/sentiment/crypto_narrative_regimes/scheduler_mvp.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+Reload and start:
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable crypto-narrative.service
+sudo systemctl start crypto-narrative.service
+sudo journalctl -u crypto-narrative.service -f
+```
 
 ## Caveats & Notes
 - **US Market Only**: Currently configured to use `coinbase` (Coinbase Pro) and `binanceus` (if available) due to US restrictions.
-- **Spot Regimes**: Regime classification is adapted for spot-only data (Price/Volume) as Futures data (OI/Funding) is unavailable in the US.
+- **Exchange Config**: Default `config.py` uses `EXCHANGES=["binanceus"]`. Add others only if region-compliant. Coinbase may use `USD` pairs rather than `USDT`.
+- **Spot Regimes**: Regime classification is adapted for spot-only data (Price/Volume) as Futures data (OI/Funding) is often unavailable in the US.
 - **Rate Limits**: The ingestion script respects rate limits, but if you run it too frequently, you might get 429s.
 - **Logs**: Logs are printed to stdout/stderr. Redirect them to a file if needed (e.g., `python3 scheduler_mvp.py > pipeline.log 2>&1`).

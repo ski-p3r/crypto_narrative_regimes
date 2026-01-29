@@ -1,7 +1,7 @@
--- TimescaleDB + core tables
+-- TimescaleDB + core tables (safe on plain Postgres)
 
 -- 1) Market microstructure
-CREATE TABLE market_metrics (
+CREATE TABLE IF NOT EXISTS market_metrics (
     ts           TIMESTAMPTZ NOT NULL,
     symbol       TEXT        NOT NULL,
     exchange     TEXT        NOT NULL,
@@ -15,11 +15,16 @@ CREATE TABLE market_metrics (
     PRIMARY KEY (ts, symbol, exchange)
 );
 
-SELECT create_hypertable('market_metrics', 'ts', if_not_exists => TRUE);
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'timescaledb') THEN
+        PERFORM create_hypertable('market_metrics', 'ts', if_not_exists => TRUE);
+    END IF;
+END$$;
 
 
 -- 2) Narratives (global per snapshot)
-CREATE TABLE narratives (
+CREATE TABLE IF NOT EXISTS narratives (
     ts                    TIMESTAMPTZ NOT NULL,
     narrative_id          TEXT        NOT NULL,
     heat_score            DOUBLE PRECISION,
@@ -30,14 +35,19 @@ CREATE TABLE narratives (
     PRIMARY KEY (ts, narrative_id)
 );
 
-CREATE UNIQUE INDEX narratives_fp_idx
+CREATE UNIQUE INDEX IF NOT EXISTS narratives_fp_idx
     ON narratives (narrative_fingerprint);
 
-SELECT create_hypertable('narratives', 'ts', if_not_exists => TRUE);
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'timescaledb') THEN
+        PERFORM create_hypertable('narratives', 'ts', if_not_exists => TRUE);
+    END IF;
+END$$;
 
 
 -- 3) Narrative–asset links
-CREATE TABLE narrative_assets (
+CREATE TABLE IF NOT EXISTS narrative_assets (
     ts             TIMESTAMPTZ NOT NULL,
     narrative_id   TEXT        NOT NULL,
     symbol         TEXT        NOT NULL,
@@ -46,11 +56,16 @@ CREATE TABLE narrative_assets (
     PRIMARY KEY (ts, narrative_id, symbol)
 );
 
-SELECT create_hypertable('narrative_assets', 'ts', if_not_exists => TRUE);
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'timescaledb') THEN
+        PERFORM create_hypertable('narrative_assets', 'ts', if_not_exists => TRUE);
+    END IF;
+END$$;
 
 
 -- 4) Regimes per symbol
-CREATE TABLE regimes (
+CREATE TABLE IF NOT EXISTS regimes (
     ts         TIMESTAMPTZ NOT NULL,
     symbol     TEXT        NOT NULL,
     regime     TEXT        NOT NULL,
@@ -61,11 +76,16 @@ CREATE TABLE regimes (
     PRIMARY KEY (ts, symbol)
 );
 
-SELECT create_hypertable('regimes', 'ts', if_not_exists => TRUE);
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'timescaledb') THEN
+        PERFORM create_hypertable('regimes', 'ts', if_not_exists => TRUE);
+    END IF;
+END$$;
 
 
 -- 5) Regime threshold versions (optional – for future tuning)
-CREATE TABLE regime_thresholds (
+CREATE TABLE IF NOT EXISTS regime_thresholds (
     version        INT PRIMARY KEY,
     cfg            JSONB NOT NULL,
     sharpe_oos     DOUBLE PRECISION,

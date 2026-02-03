@@ -28,3 +28,34 @@ REGIME_CFG = {
         # Fallback if no other condition met
     }
 }
+
+# Liquidation Cascade Detection thresholds
+LIQUIDATION_CFG = {
+    "cascade_threshold_usd": 500000,  # USD threshold to trigger cascade detection
+    "velocity_window": 4,  # number of hours to calculate liquidation velocity
+    "critical_velocity": 200000,  # USD per hour velocity threshold
+}
+
+# Funding Rate Anomaly thresholds
+FUNDING_CFG = {
+    "anomaly_z_threshold": 2.0,  # Z-score threshold for anomaly detection
+    "reversal_threshold": 0.05,  # 5% funding rate reversal signal
+}
+
+# Volatility Regime thresholds
+VOLATILITY_CFG = {
+    "stable_threshold": 0.01,  # 1% volatility threshold for STABLE regime
+    "high_vol_threshold": 0.05,  # 5% volatility threshold for HIGH_VOL regime
+    "explosive_threshold": 0.10,  # 10% volatility threshold for EXPLOSIVE regime
+    "window": 24,  # hours
+}
+
+# Multi-timeframe regime parameters
+TIMEFRAMES = ["1h", "4h", "1d", "1w"]
+
+# Correlation engine thresholds
+CORRELATION_CFG = {
+    "window": 24 * 7,  # 7 days in hours
+    "correlation_break_threshold": 0.5,  # significant deviation from normal correlation
+    "primary_assets": ["BTC/USDT", "ETH/USDT", "SOL/USDT"],
+}

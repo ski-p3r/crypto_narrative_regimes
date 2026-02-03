@@ -6,9 +6,19 @@ interface HeaderProps {
   lastUpdate: Date;
   cascadeCount: number;
   volatilityEvents: number;
+  correlationBreaks?: number;
+  updateFrequency?: number;
+  onFrequencyChange?: (frequency: number) => void;
 }
 
-export function Header({ lastUpdate, cascadeCount, volatilityEvents }: HeaderProps) {
+export function Header({
+  lastUpdate,
+  cascadeCount,
+  volatilityEvents,
+  correlationBreaks = 0,
+  updateFrequency = 10000,
+  onFrequencyChange,
+}: HeaderProps) {
   const formatTime = (date: Date) => {
     return new Intl.DateTimeFormat('en-US', {
       month: '2-digit',
@@ -39,7 +49,7 @@ export function Header({ lastUpdate, cascadeCount, volatilityEvents }: HeaderPro
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-4 gap-4">
           <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -63,12 +73,32 @@ export function Header({ lastUpdate, cascadeCount, volatilityEvents }: HeaderPro
           <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
             <div className="flex items-center justify-between">
               <div>
+                <p className="text-xs text-slate-400 uppercase font-semibold">Correlation Breaks</p>
+                <p className="text-2xl font-bold text-cyan-400 mt-1">{correlationBreaks}</p>
+              </div>
+              <Activity className="w-8 h-8 text-cyan-500 opacity-30" />
+            </div>
+          </div>
+
+          <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div>
                 <p className="text-xs text-slate-400 uppercase font-semibold">Data Status</p>
                 <p className="text-lg font-bold text-green-400 mt-1 flex items-center gap-1">
                   <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
                   Live
                 </p>
               </div>
+              <select
+                value={updateFrequency}
+                onChange={(e) => onFrequencyChange?.(parseInt(e.target.value))}
+                className="absolute bottom-4 right-6 bg-slate-700 border border-slate-600 text-slate-200 text-xs rounded px-2 py-1"
+              >
+                <option value={5000}>5s</option>
+                <option value={10000}>10s</option>
+                <option value={30000}>30s</option>
+                <option value={60000}>1m</option>
+              </select>
             </div>
           </div>
         </div>

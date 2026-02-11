@@ -24,6 +24,18 @@ def hourly_pipeline():
     run_narrative_stream()
     time.sleep(10)
     compute_features_and_classify_regimes()
+    time.sleep(5)
+    # Run advanced features pipeline (bk toggle via USE_BK_FEATURES=1)
+    try:
+        use_bk = os.getenv("USE_BK_FEATURES", "0") == "1"
+        if use_bk:
+            from bk.pipeline_features_master import run_all_features as run_all_features_bk
+            run_all_features_bk()
+        else:
+            from pipeline_features_master import run_all_features as run_all_features_main
+            run_all_features_main()
+    except Exception as e:
+        log.error(f"[SCHED] Error running features pipeline: {e}")
     log.info("[SCHED] Hourly pipeline complete")
 
 

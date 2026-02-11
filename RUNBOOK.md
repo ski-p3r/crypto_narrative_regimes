@@ -1,18 +1,21 @@
 # Crypto Narrative Regimes (Droplet Runbook)
 
 End-to-end hourly pipeline on a DigitalOcean droplet (US-only):
+
 - Ingest spot data from `binanceus` for `BTC/USDT`, `ETH/USDT`, `SOL/USDT`
 - Generate narratives via OpenAI and store narrative heat
 - Classify regimes from market + narrative features
 - Store everything in Postgres
 
 **.env (auto-loaded by scripts)**
+
 ```
 DB_URL=postgresql://crypto_admin:change_me_please@localhost:5432/crypto
 OPENAI_API_KEY=sk-REPLACE_ME
 ```
 
 **Initialize DB**
+
 ```zsh
 sudo -u postgres psql <<'SQL'
 CREATE DATABASE crypto;
@@ -23,6 +26,7 @@ psql "postgresql://crypto_admin:change_me_please@localhost:5432/crypto" -f schem
 ```
 
 **Local Runs (venv)**
+
 ```zsh
 python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
@@ -35,6 +39,7 @@ python scheduler_mvp.py
 ```
 
 **Verify Inserts**
+
 ```zsh
 DB_URL="$(awk -F= '/^DB_URL=/ {print $2}' .env)"
 psql "$DB_URL" -c "SELECT ts, symbol, exchange, price, ret_1h, volume FROM market_metrics ORDER BY ts DESC LIMIT 20;"
@@ -44,6 +49,7 @@ psql "$DB_URL" -c "SELECT ts, symbol, regime, long_bias, risk_mult, confidence F
 ```
 
 **Docker (optional)**
+
 ```zsh
 export OPENAI_API_KEY=sk-REPLACE_ME
 docker compose build
@@ -55,14 +61,18 @@ docker compose exec db psql -U crypto_admin -d crypto -c "SELECT COUNT(*) FROM m
 ```
 
 **Keep Alive**
+
 - tmux:
+
 ```zsh
 tmux new -s crypto
 source venv/bin/activate
 python scheduler_mvp.py
 # detach: Ctrl+b then d
 ```
+
 - systemd template:
+
 ```zsh
 sudo tee /etc/systemd/system/crypto-narrative@.service >/dev/null <<'UNIT'
 [Unit]
@@ -87,6 +97,7 @@ sudo journalctl -u crypto-narrative@$(whoami).service -f
 ```
 
 **Notes**
+
 - Region constraints: Bybit excluded; use `binanceus`. Futures fields (OI/funding/liqs) omitted.
 - 1h returns via OHLCV; narratives fingerprinted by snapshot to dedupe.
 - `schema.sql` is Timescale-safe on plain Postgres (conditional hypertables).

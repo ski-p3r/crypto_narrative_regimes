@@ -43,3 +43,18 @@ This will run `bk/pipeline_features_master.py` which calls all bk feature wrappe
 - Storage: data is upserted into the existing `market_metrics` table. Feature outputs are returned by modules and consumed by the pipeline; regimes are written to the `regimes` table.
 
 If you prefer persisting feature alerts, we can add an optional `feature_alerts` table and a sink in the bk pipeline.
+
+## Paper trader (optional)
+
+Enable simulated trades after regimes and features:
+
+```bash
+export USE_PAPER_TRADER=1
+export PAPER_CONF_THRESHOLD=0.7          # minimum regime confidence to act
+export PAPER_LONG_REGIME=SPOT_IGNITION   # regime to go LONG
+export PAPER_SHORT_REGIME=SPOT_COOLING   # regime to go SHORT
+export PAPER_TRADE_SIZE=1.0
+python scheduler_mvp.py
+```
+
+Schema additions are in `schema.sql` (`paper_trades` table). The module `bk/paper_trader.py` opens a trade when confidence exceeds the threshold and closes on signal change; entries/exits are recorded with PnL.

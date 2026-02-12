@@ -7,17 +7,20 @@ Successfully implemented 5 advanced market analysis features for your crypto nar
 ## What Was Implemented
 
 ### 1. ✅ Enhanced Market Data Ingestion (`ingestion_enhanced.py`)
+
 - Fetches spot prices from Binance.US
 - Queries liquidation data from Binance.US futures API
 - Retrieves funding rates
 - Automatically merges and upserts to PostgreSQL
 
-**Configuration**: 
+**Configuration**:
+
 - Uses `binanceus` exchange for US market only
 - Symbols: BTC/USDT, ETH/USDT, SOL/USDT (configurable)
 - Runs hourly, can be adjusted
 
 ### 2. ✅ Liquidation Cascade Detection (`features_liquidation_cascade.py`)
+
 - **detect_cascade_events()**: Identifies rapid liquidation bursts
   - Measures velocity (USD/hour)
   - Detects one-sided cascades (LONG/SHORT/BALANCED)
@@ -27,6 +30,7 @@ Successfully implemented 5 advanced market analysis features for your crypto nar
   - Useful for identifying support/resistance that will cascade when broken
 
 ### 3. ✅ Funding Rate Anomalies (`features_funding_anomaly.py`)
+
 - **detect_funding_anomalies()**: Z-score based anomaly detection
   - Flags extreme funding levels
   - Identifies volatility spikes in funding
@@ -37,34 +41,40 @@ Successfully implemented 5 advanced market analysis features for your crypto nar
   - Strong historical predictor of directional moves
 
 ### 4. ✅ Volatility Regime Analysis (`features_volatility_regime.py`)
+
 - Classifies market into 4 states: STABLE, HIGH_VOL, EXPLOSIVE, EXTREME
 - Computes volatility clustering (high clustering = predictable)
 - Analyzes volatility persistence (mean reversion potential)
 - Provides risk multipliers (0.7x to 2.5x) per regime
 
 ### 5. ✅ Multi-Timeframe Regime Confirmation (`features_multi_timeframe.py`)
+
 - Computes regimes at 1h, 4h, 1d, 1w timeframes
 - Calculates confidence score (0-100%) based on timeframe agreement
 - Filters false signals when timeframes disagree
 - High-confidence signals ideal for trading decisions
 
 ### 6. ✅ Cross-Exchange Correlation Engine (`features_correlation_engine.py`)
+
 - Tracks BTC/ETH/SOL pairwise correlations
 - Identifies leading assets (which leads regime shifts)
 - Detects divergence events (negative correlation = pair trade signals)
 - Analyzes correlation persistence and changes
 
 ### 7. ✅ Master Pipeline (`pipeline_features_master.py`)
+
 - Orchestrates all feature modules
 - Runs sequentially for consistent ordering
 - Logging at each step
 - Can run on-demand or periodically
 
 ### 10. ✅ Test Suite (`test_features.py`)
+
 Comprehensive test script covering:
+
 - Configuration loading
 - All 6 feature modules
- 
+
 - Master pipeline
 - Enhanced ingestion
 
@@ -109,6 +119,7 @@ Run: `python test_features.py`
 ## Pre-Deployment Checklist
 
 ### Environment Setup
+
 - [ ] Python 3.8+ installed
 - [ ] PostgreSQL 12+ running
 - [ ] `.env` file created with required variables:
@@ -118,6 +129,7 @@ Run: `python test_features.py`
   ```
 
 ### Database Setup
+
 - [ ] PostgreSQL database created
 - [ ] `market_metrics` table exists with columns:
   - ts, symbol, exchange, price, ret_1h, oi, funding, long_liq_usd, short_liq_usd, volume
@@ -126,6 +138,7 @@ Run: `python test_features.py`
 - [ ] Tables indexed on (ts, symbol, exchange) for performance
 
 ### Python Environment
+
 - [ ] Dependencies installed: `pip install ccxt pandas sqlalchemy requests python-dotenv`
 - [ ] All feature modules importable:
   ```bash
@@ -133,9 +146,8 @@ Run: `python test_features.py`
   ```
 - [ ] Test suite passes: `python test_features.py`
 
- 
-
 ### API Connectivity
+
 - [ ] Can connect to Binance.US: `python -c "import ccxt; ccxt.binanceus()"`
 - [ ] PostgreSQL connection works: `psql $DB_URL -c "SELECT 1"`
 - [ ] Database tables accessible from Python
@@ -151,12 +163,13 @@ python ingestion_enhanced.py
 # Terminal 2: Run feature pipeline (hourly or on-demand)
 python pipeline_features_master.py
 
- 
+
 ```
 
 ### Option 2: Production Deployment
 
 #### Backend (Python Services)
+
 ```bash
 # Using systemd service files
 
@@ -171,9 +184,8 @@ sudo systemctl start crypto-ingest
 tail -f /var/log/crypto-ingest.log
 ```
 
- 
-
 #### Database
+
 ```bash
 # Backup before going live
 pg_dump -h hostname -U username -d dbname > backup.sql
@@ -233,15 +245,13 @@ FUNDING_CFG["anomaly_z_threshold"] = 2.5
    - Funding anomaly false positive rate
    - Regime confirmation accuracy
 
- 
-
 ### Alert Setup
 
 ```bash
 # Monitor ingestion (alert if no data for 2+ hours)
 * * * * * check_latest_data.sh || send_alert "Ingestion down"
 
- 
+
 
 # Monitor database growth
 0 0 * * * check_db_size.sh
@@ -249,12 +259,12 @@ FUNDING_CFG["anomaly_z_threshold"] = 2.5
 
 ## Performance Benchmarks
 
-| Metric | Expected | Limit |
-|--------|----------|-------|
-| Ingestion cycle | 2-5 min | <10 min |
-| Feature pipeline | 20-30 sec | <60 sec |
-| Cascade detection | 5 sec | <15 sec |
- 
+| Metric            | Expected  | Limit   |
+| ----------------- | --------- | ------- |
+| Ingestion cycle   | 2-5 min   | <10 min |
+| Feature pipeline  | 20-30 sec | <60 sec |
+| Cascade detection | 5 sec     | <15 sec |
+
 | DB query (latest data) | 10-50ms | <100ms |
 
 ## Scaling Notes
@@ -280,13 +290,13 @@ For more symbols or higher frequency:
 ### Common Issues
 
 **No liquidation data:**
+
 - Check Binance.US futures API availability
 - Verify network access to API
 - Lower `cascade_threshold_usd` for testing
 
- 
-
 **High memory usage:**
+
 - Reduce data lookback windows
 - Add `LIMIT` to SQL queries
 - Consider partitioning by date
@@ -308,6 +318,7 @@ For more symbols or higher frequency:
 ## Support
 
 For issues:
+
 1. Check logs: `grep "[FEATURE]" logfile`
 2. Run tests: `python test_features.py`
 3. Review data: `psql $DB_URL -c "SELECT * FROM market_metrics LIMIT 5"`

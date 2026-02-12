@@ -91,3 +91,21 @@ CREATE TABLE IF NOT EXISTS regime_thresholds (
     sharpe_oos     DOUBLE PRECISION,
     created_at     TIMESTAMPTZ DEFAULT NOW()
 );
+
+
+-- 6) Paper trades (simulation)
+CREATE TABLE IF NOT EXISTS paper_trades (
+    id           BIGSERIAL PRIMARY KEY,
+    ts           TIMESTAMPTZ NOT NULL,
+    symbol       TEXT        NOT NULL,
+    side         TEXT        NOT NULL CHECK (side IN ('LONG','SHORT')),
+    size         DOUBLE PRECISION DEFAULT 1.0,
+    entry_price  DOUBLE PRECISION,
+    exit_price   DOUBLE PRECISION,
+    pnl          DOUBLE PRECISION,
+    status       TEXT        NOT NULL CHECK (status IN ('OPEN','CLOSED')),
+    reason       TEXT,
+    regime       TEXT,
+    confidence   DOUBLE PRECISION
+);
+

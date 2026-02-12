@@ -9,9 +9,6 @@ This implementation adds five powerful market analysis features to your crypto n
 3. **Multi-Timeframe Regime Confirmation** - Validates regimes across 1h, 4h, 1d, 1w timeframes
 4. **Volatility Regime Analysis** - Classifies market into STABLE/HIGH_VOL/EXPLOSIVE states
 5. **Cross-Exchange Correlation Engine** - Tracks BTC/ETH/SOL relationships for divergence signals
- 
-
- 
 
 ## File Structure
 
@@ -52,8 +49,6 @@ This implementation adds five powerful market analysis features to your crypto n
   - Runs all feature modules sequentially
   - Logs results and metrics
 
- 
-
 ## Setup Instructions
 
 ### 1. Install Dependencies
@@ -62,7 +57,7 @@ This implementation adds five powerful market analysis features to your crypto n
 # Python dependencies
 pip install ccxt pandas sqlalchemy requests
 
- 
+
 ```
 
 ### 2. Environment Variables
@@ -76,7 +71,7 @@ export DB_URL="postgresql://user:password@localhost:5432/crypto"
 # OpenAI (for narrative system)
 export OPENAI_API_KEY="sk-..."
 
- 
+
 ```
 
 ### 3. Configure Market Ingestion
@@ -105,8 +100,6 @@ python ingestion_enhanced.py
 python pipeline_features_master.py
 ```
 
- 
-
 ## Feature Details
 
 ### Liquidation Cascade Detection
@@ -114,36 +107,36 @@ python pipeline_features_master.py
 **Purpose**: Early warning system for flash crashes and liquidation cascades.
 
 **Algorithm**:
+
 1. Sum liquidations over configurable window (4 hours by default)
 2. Calculate velocity: total USD / elapsed hours
 3. Flag as CASCADE if velocity > critical threshold AND total > USD threshold
 4. Classify as one-sided (LONG/SHORT) or BALANCED
-
- 
 
 ### Funding Rate Anomaly Detection
 
 **Purpose**: Identify extreme funding levels that often precede reversals.
 
 **Algorithm**:
+
 1. Compute Z-score of funding rate (24h rolling)
 2. Detect rapid direction changes
 3. Flag anomalies when Z-score > threshold OR change > reversal threshold
 4. Track funding volatility
-
- 
 
 ### Volatility Regime Classification
 
 **Purpose**: Adapt risk management based on market volatility state.
 
 **Regimes**:
+
 - **STABLE** (vol ≤ 1%): Low volatility, potentially boring, good for mean-reversion strategies
 - **HIGH_VOL** (1% < vol ≤ 5%): Elevated volatility, trending potential
 - **EXPLOSIVE** (5% < vol ≤ 10%): Extreme volatility, high risk
 - **EXTREME** (vol > 10%): Dangerous conditions, reduce size
 
 **Risk Multipliers**:
+
 - STABLE: 0.7x (reduce risk)
 - HIGH_VOL: 1.2x (normal risk)
 - EXPLOSIVE: 1.8x (increase caution)
@@ -154,6 +147,7 @@ python pipeline_features_master.py
 **Purpose**: Filter false signals by requiring regime agreement across multiple timeframes.
 
 **Confidence Scoring**:
+
 - Computes regimes at 1h, 4h, 1d, 1w
 - Confidence = % of timeframes agreeing
 - 100% agreement = highly reliable signal
@@ -166,16 +160,19 @@ python pipeline_features_master.py
 **Purpose**: Identify when normally-correlated assets diverge (pair trading signals).
 
 **Metrics Tracked**:
+
 - BTC/ETH correlation (normally 0.7-0.9)
 - ETH/SOL correlation (normally 0.6-0.8)
 - BTC/SOL correlation (normally 0.5-0.7)
 
 **Divergence Signals**:
+
 - When correlation drops below -0.5 (negative correlation)
 - Typically precedes reversal
 - Good for pair trading (long leading asset, short lagging asset)
 
 **Output**:
+
 ```json
 {
   "event_type": "CORRELATION_BREAK",
@@ -187,10 +184,6 @@ python pipeline_features_master.py
   }
 }
 ```
-
- 
-
- 
 
 ## Calibration & Tuning
 
@@ -231,7 +224,7 @@ VOLATILITY_CFG = {
 - **Database**: ~500K rows/month for 3 symbols, hourly updates
 - **API Calls**: ~100 requests/hour to Binance.US
 - **Computation**: <30 seconds for full feature pipeline
- - **Memory**: ~200MB Python process
+- **Memory**: ~200MB Python process
 
 ### Logging
 
@@ -245,7 +238,7 @@ grep "\[MKT\]" <logfile>
 # Monitor features
 grep "\[CASCADE\]\|\[FUND\]\|\[VOL\]" <logfile>
 
- 
+
 ```
 
 ## Troubleshooting
@@ -255,6 +248,7 @@ grep "\[CASCADE\]\|\[FUND\]\|\[VOL\]" <logfile>
 **Issue**: Liquidation cascade module returns empty results
 
 **Solutions**:
+
 1. Verify Binance.US futures API is accessible
 2. Check liquidation thresholds aren't too strict
 3. Increase `cascade_threshold_usd` in config
@@ -265,11 +259,10 @@ grep "\[CASCADE\]\|\[FUND\]\|\[VOL\]" <logfile>
 **Issue**: Funding module returns None values
 
 **Solutions**:
+
 1. Check if Binance.US futures are available in your region
 2. Verify API connectivity
 3. Some symbols may not have funding rates available
-
- 
 
 ## Advanced Customization
 
